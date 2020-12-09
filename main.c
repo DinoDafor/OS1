@@ -166,35 +166,23 @@ void read_file(int id_thread, int idFile){
     //todo переделать под подсчитывание среднего
     fread(&block, 1 , G, file);
 
-    int min = 0;
-    int flag = 1;
 
+    unsigned int sum_in_block = 0;
+    unsigned int sum= 0;
     size_t parts = E * 1024 * 1024 / G;
 
     for (size_t part = 0; part < parts; part ++){
-        int min_from_block = 0;
-        int flag_for_block = 1;
+
         for (size_t i = 0; i < sizeof(block); i += 4){
             unsigned int num = 0;
-
             for (int j = 0; j < 4; j ++) {
                 num = (num<<8) + block[i + j];
             }
-            if (flag_for_block == 1){
-                flag_for_block = 0;
-                min_from_block = num;
-            }else{
-                if (min_from_block > num) min_from_block = num;
-            }
+            sum_in_block+=num;
         }
-        if (flag == 1) {
-            flag = 0;
-            min = min_from_block;
-        }else{
-            if (min > min_from_block) min = min_from_block;
-        }
+        sum+=sum_in_block;
     }
-    fprintf(stdout,"\nMin from labOS%d from thread-%d is %d\n",idFile, id_thread, min );
+    fprintf(stdout,"\nAvg from labOS%d from thread-%d is %lu\n",idFile, id_thread, sum/(parts*16) );
     fflush(stdout);
     fclose(file);
     pthread_mutex_unlock(&cur_mut);
