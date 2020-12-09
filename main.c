@@ -33,13 +33,13 @@
 //vancA=197;B=0xA35E1090;C=mmap;D=78;E=72;F=block;G=10;H=random;I=35;J=min;K=sem
 //mitin A=128;B=0x74594352;C=malloc;D=55;E=144;F=block;G=65;H=seq;I=48;J=avg;K=cv
 
-#define A 197
-#define D 78
-#define E 72
-#define G 10
-#define I 35
+#define A 128
+#define D 55
+#define E 144
+#define G 65
+#define I 48
 
-
+//todo свои значения и найминг
 const int filenumbers = 3;
 
 pthread_mutex_t mut1;
@@ -132,10 +132,11 @@ void write_file(writer_thread_info* data, int idFile){//todo можно не п�
     snprintf(defaultname, sizeof(defaultname) + 1, "labOS%d",++idFile);
     FILE* file = fopen(defaultname, "wb");
 
-    size_t file_size = E * 1024 * 1024;
+    //todo возможно переделать под полное заполнение файла областью памяти, хотя в задании сказано, что надо просто перенести память в файл, а не заполнять полностью её
+    size_t memory_size = A * 1024 * 1024;
     size_t rest = 0;
-    while (rest < file_size) {
-        long size = file_size - rest >= G ? G : file_size - rest;
+    while (rest < memory_size) {
+        long  size = memory_size - rest >= G ? G : memory_size - rest;
         rest += fwrite(data->address + rest, 1, size, file);
     }
     fclose(file);
@@ -234,7 +235,7 @@ int main(void){
     address = malloc(A*1024*1024);
 
     pthread_create(&generate_thread, NULL, generate_info, address);
-     pthread_mutex_init(&mut1, NULL);
+    pthread_mutex_init(&mut1, NULL);
     pthread_mutex_init(&mut2, NULL);
     pthread_mutex_init(&mut3, NULL);
 
@@ -245,11 +246,9 @@ int main(void){
     for (int  i = 0; i < filenumbers; i++) {
         writer_information[i].filenumber = i;
         writer_information[i].address = address;
+        pthread_create(&writer_thread[i], NULL, write_files, &writer_information[i]);
 
     }
-    //todo почему не создавать в прошлом цикле?
-    for (int i = 0; i < filenumbers; i ++)
-        pthread_create(&writer_thread[i], NULL, write_files, &writer_information[i]);
 
     pthread_t reader_thread[I];
     reader_thread_info reader_information[I];
@@ -277,13 +276,11 @@ int main(void){
         pthread_join(writer_thread[i], NULL);
 
     pthread_join(generate_thread, NULL);
+
     pthread_mutex_destroy(&mut1);
     pthread_mutex_destroy(&mut2);
     pthread_mutex_destroy(&mut3);
 
-//    sem_destroy(&sem1);
-//    sem_destroy(&sem2);
-//    sem_destroy(&sem3);
 
     free(address);
     return 0;
