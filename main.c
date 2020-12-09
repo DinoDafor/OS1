@@ -34,18 +34,18 @@
 //mitin A=128;B=0x74594352;C=malloc;D=55;E=144;F=block;G=65;H=seq;I=48;J=avg;K=cv
 
 #define A 197
-#define B 0xA35E1090
 #define D 78
 #define E 72
 #define G 10
 #define I 35
 
 
-const int filenumbers = A/ E + (A % E == 0 ? 0: 1);
-sem_t sem1;
-sem_t sem2;
-sem_t sem3;
-//pthread_mutex_t mut;
+const int filenumbers = 3;
+
+pthread_mutex_t mut1;
+pthread_mutex_t mut2;
+pthread_mutex_t mut3;
+
 
 int loop = 1;
 
@@ -65,14 +65,6 @@ typedef struct {
     int number_thread;
 }reader_thread_info;
 
-
-char* allocate(){
-    return mmap(B, A * 1024 * 1024,
-                PROT_EXEC | PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_ANONYMOUS,
-                -1,
-                0);
-}
 
 void* write_memory(void* data){
 
@@ -122,17 +114,19 @@ void* generate_info(void* data){
     pthread_exit(0);
 }
 
-sem_t* get_sem(int id){
-    if (id == 0) return &sem1;
-    if (id == 1) return &sem2;
-    if (id == 2) return &sem3;
+pthread_mutex_t get_mut(int id){
+    if (id == 0) return mut1;
+    if (id == 1) return mut2;
+    if (id == 2) return mut3;
 }
 
 
 void write_file(writer_thread_info* data, int idFile){//todo можно не передавать айди, а брать из data->
-    // pthread_mutex_lock(&mut);
-    sem_t* cur_sem = get_sem(idFile);
-    sem_wait(cur_sem);
+
+    pthread_mutex_t cur_mut = get_mut(idFile);
+    pthread_mutex_lock(&cur_mut);
+
+
 
     char* defaultname = malloc(sizeof(char) * 6);
     snprintf(defaultname, sizeof(defaultname) + 1, "labOS%d",++idFile);
@@ -144,8 +138,9 @@ void write_file(writer_thread_info* data, int idFile){//todo можно не п�
         long size = file_size - rest >= G ? G : file_size - rest;
         rest += fwrite(data->address + rest, 1, size, file);
     }
-    //pthread_mutex_unlock(&mut);
-    sem_post(cur_sem);
+    fclose(file);
+    pthread_mutex_unlock(&cur_mut);
+
 }
 
 void* write_files(void* data){
@@ -158,8 +153,8 @@ void* write_files(void* data){
 
 
 void read_file(int id_thread, int idFile){
-    sem_t* cur_sem = get_sem(idFile);
-    sem_wait(cur_sem);
+    pthread_mutex_t cur_mut = get_mut(idFile);
+    pthread_mutex_lock(&cur_mut);
 
 
     char* defaultname = malloc(sizeof(char) * 6);
@@ -201,7 +196,7 @@ void read_file(int id_thread, int idFile){
     fprintf(stdout,"\nMin from labOS%d from thread-%d is %d\n",idFile, id_thread, min );
     fflush(stdout);
     fclose(file);
-    sem_post(cur_sem);
+    pthread_mutex_unlock(&cur_mut);
 }
 
 void* read_files(void* data){
@@ -239,10 +234,10 @@ int main(void){
     address = malloc(A*1024*1024);
 
     pthread_create(&generate_thread, NULL, generate_info, address);
-    // pthread_mutex_init(&mut, NULL);
-    sem_init(&sem1, 0, 1);
-    sem_init(&sem2, 0, 1);
-    sem_init(&sem3, 0, 1);
+     pthread_mutex_init(&mut1, NULL);
+    pthread_mutex_init(&mut2, NULL);
+    pthread_mutex_init(&mut3, NULL);
+
 
     pthread_t writer_thread[filenumbers];
     writer_thread_info writer_information[filenumbers];
@@ -282,14 +277,17 @@ int main(void){
         pthread_join(writer_thread[i], NULL);
 
     pthread_join(generate_thread, NULL);
-    //pthread_mutex_destroy(&mut);
-    sem_destroy(&sem1);
-    sem_destroy(&sem2);
-    sem_destroy(&sem3);
+    pthread_mutex_destroy(&mut1);
+    pthread_mutex_destroy(&mut2);
+    pthread_mutex_destroy(&mut3);
+
+//    sem_destroy(&sem1);
+//    sem_destroy(&sem2);
+//    sem_destroy(&sem3);
 
     free(address);
     return 0;
 }
 //http://cppstudio.com/post/1641/ fread
 //http://cppstudio.com/post/1249/ fflush
-//
+//https://learnc.info/c/pthreads_mutex_introduction.html mutex
